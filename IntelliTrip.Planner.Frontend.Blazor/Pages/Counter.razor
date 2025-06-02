@@ -1,0 +1,22 @@
+﻿@page "/counter"
+
+<h1>Counter</h1>
+
+<p role="status">Current count: @currentCount</p>
+
+<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+
+@code {
+    private int currentCount = 0;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+}
+
+// Deze pagina is niet meer in gebruik in de reisplanner.
+<div class="container mt-5 text-center">
+    <h2 class="text-secondary">Deze pagina is niet beschikbaar</h2>
+    <p class="lead">Gebruik het menu om terug te keren naar de hoofdpagina of de chat.</p>
+</div>

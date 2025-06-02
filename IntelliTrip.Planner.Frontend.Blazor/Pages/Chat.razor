@@ -1,0 +1,104 @@
+@page "/chat"
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Net.Http.Json
+@using Markdig
+@using IntelliTrip.Planner.Frontend.Blazor.Services
+@inject IJSRuntime JS
+@inject ChatSignalRService ChatSignalR
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10 col-lg-8">
+            <div class="card shadow-lg border-0 mb-4 travel-hero-card position-relative overflow-hidden">
+                <div class="travel-hero-bg"></div>
+                <div class="card-body p-5 text-center travel-hero-content">
+                    <h2 class="display-5 mb-3 text-gradient fw-bold text-center">Chat met je Reisassistent</h2>
+                    <p class="lead text-center mb-4">Stel je vragen, deel je wensen en ontvang direct een persoonlijk reisplan. Onze slimme agent helpt je met het vinden van de beste routes, hotels en activiteiten!</p>
+                    <div class="chat-window mb-3 p-3 travel-feature-card" style="min-height: 250px; max-height: 350px; overflow-y: auto; background: var(--additional-color-2); color: var(--neutral-color);">
+                        @if (messages.Count == 0)
+                        {
+                            <div class="text-muted text-center">Er zijn nog geen berichten. Stel je eerste vraag!</div>
+                        }
+                        else
+                        {
+                            @foreach (var msg in messages)
+                            {
+                                <div class="mb-2">
+                                    <span class="fw-bold text-primary">@msg.Sender:</span>
+                                    @if (msg.Sender == "Agent" && msg.IsMarkdown)
+                                    {
+                                        <span class="agent-message" @key="msg" @onclick:stopPropagation="true" @onclick:preventDefault="true" >
+                                            @((MarkupString)Markdig.Markdown.ToHtml(msg.Text.Replace("\n", "  \n"), markdownPipeline))
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span>@msg.Text</span>
+                                    }
+                                </div>
+                            }
+                            @if (isAgentTyping)
+                            {
+                                <div class="mb-2 agent-typing-indicator">
+                                    <span class="fw-bold text-primary">Agent:</span>
+                                    <span class="text-muted"> is aan het typen<span class="typing-dots">...</span></span>
+                                </div>
+                            }
+                        }
+                    </div>
+                    <form class="input-group" @onsubmit="SendMessageAsync" style="gap: 0.5rem;">
+                        <input type="text" class="form-control form-control-lg travel-input" placeholder="Typ je bericht..." @bind="userInput" />
+                        <button class="btn travel-cta-btn btn-lg" type="submit" disabled="@(string.IsNullOrWhiteSpace(userInput))">Verstuur</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string userInput = string.Empty;
+    private List<ChatMessage> messages = new();
+    private bool isAgentTyping = false;
+    private static readonly MarkdownPipeline markdownPipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+
+    protected override async Task OnInitializedAsync()
+    {
+        ChatSignalR.OnMessageReceived += async (msg) =>
+        {
+            await InvokeAsync(() =>
+            {
+                if (messages.Count == 0 || messages.Last().Sender != "Agent")
+                    messages.Add(new ChatMessage { Sender = "Agent", Text = string.Empty, IsMarkdown = true });
+                messages.Last().Text += msg;
+                StateHasChanged();
+            });
+        };
+        await ChatSignalR.StartAsync();
+    }
+
+    private async Task SendMessageAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(userInput))
+        {
+            messages.Add(new ChatMessage { Sender = "Jij", Text = userInput });
+            isAgentTyping = true;
+            StateHasChanged();
+            await ChatSignalR.SendMessageAsync(userInput);
+            userInput = string.Empty;
+        }
+    }
+
+    public class ChatMessage
+    {
+        public string Sender { get; set; } = string.Empty;
+        public string Text { get; set; } = string.Empty;
+        public bool IsMarkdown { get; set; } = false;
+    }
+
+    public class ChatMessageResponse
+    {
+        public string? Response { get; set; }
+    }
+}

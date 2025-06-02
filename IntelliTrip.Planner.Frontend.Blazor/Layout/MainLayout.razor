@@ -1,0 +1,53 @@
+﻿@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Routing
+@inherits LayoutComponentBase
+
+<header class="navbar navbar-expand-lg navbar-light bg-white shadow-sm travel-navbar">
+    <div class="container-fluid">
+        <a class="navbar-brand d-flex align-items-center" href="/">
+            <img src="/img/logo.jpg" alt="IntelliTrip Logo" height="40" class="me-2" style="max-height:40px; border-radius: 0.5rem; background: var(--additional-color-2); padding: 0.2rem;" />
+            <span class="fw-bold text-primary fs-4">IntelliTrip Planner</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <nav class="collapse navbar-collapse" id="mainNavbar">
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Home</NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/chat">Chat</NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/overzicht">Overzicht</NavLink>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</header>
+
+<main class="travel-main-content">
+    @Body
+</main>
+
+<style>
+.travel-navbar {
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    border-bottom: 1px solid var(--additional-color-2);
+    z-index: 100;
+    background: var(--neutral-color);
+}
+.navbar-brand, .navbar-nav .nav-link {
+    color: var(--primary-color) !important;
+}
+.navbar-nav .nav-link.active {
+    color: var(--secondary-color) !important;
+    font-weight: bold;
+}
+.travel-main-content {
+    min-height: 80vh;
+    background: var(--neutral-color);
+    padding-top: 2rem;
+}
+</style>
