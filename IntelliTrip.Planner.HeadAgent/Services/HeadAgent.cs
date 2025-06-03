@@ -1,12 +1,15 @@
-using System;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using IntelliTrip.Planner.Agents.Flight.Services;
 using IntelliTrip.Planner.Agents.Shared.Interfaces;
 using IntelliTrip.Planner.Models.Models;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Agents;
+using ModelContextProtocol;
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
+using System;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace IntelliTrip.Planner.HeadAgent.Services;
 
@@ -21,7 +24,7 @@ public class HeadAgentAgent : IHeadAgent
         _flightAgent = flightAgent ?? throw new ArgumentNullException(nameof(flightAgent));
     }
 
-    public ChatCompletionAgent CreateHeadAgent()
+    public async Task<ChatCompletionAgent> CreateHeadAgent()
     {
         ChatCompletionAgent triageAgent =
           new()
@@ -32,6 +35,11 @@ public class HeadAgentAgent : IHeadAgent
               Description = "Handle customer requests.",
               Arguments = new KernelArguments(new PromptExecutionSettings() { FunctionChoiceBehavior = FunctionChoiceBehavior.Auto() }),
           };
+
+        await using IMcpClient mcpClient = await CreateMcpClientAsync();
+
+
+        // Create a kernel and register the MCP tools
         return triageAgent;
     }
 
@@ -81,6 +89,73 @@ public class HeadAgentAgent : IHeadAgent
             if (!string.IsNullOrEmpty(text))
                 yield return text;
         }
+    }
+
+    protected static Task<IMcpClient> CreateMcpClientAsync(
+        Kernel? kernel = null,
+        Func<Kernel, CreateMessageRequestParams?, IProgress<ProgressNotificationValue>, CancellationToken, Task<CreateMessageResult>>? samplingRequestHandler = null)
+    {
+        KernelFunction? skSamplingHandler = null;
+
+        // Create and return the MCP client
+        return McpClientFactory.CreateAsync(
+            clientTransport: new StdioClientTransport(new StdioClientTransportOptions
+            {
+                Name = "MCPServer",
+                Command = GetMCPServerPath(), // Path to the MCPServer executable
+            }),
+            clientOptions: samplingRequestHandler != null ? new McpClientOptions()
+            {
+                Capabilities = new ClientCapabilities
+                {
+                    Sampling = new SamplingCapability
+                    {
+                        SamplingHandler = InvokeHandlerAsync
+                    },
+                },
+            } : null
+         );
+
+        async ValueTask<CreateMessageResult> InvokeHandlerAsync(CreateMessageRequestParams? request, IProgress<ProgressNotificationValue> progress, CancellationToken cancellationToken)
+        {
+            if (request is null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            skSamplingHandler ??= KernelFunctionFactory.CreateFromMethod(
+                (CreateMessageRequestParams? request, IProgress<ProgressNotificationValue> progress, CancellationToken ct) =>
+                {
+                    return samplingRequestHandler(kernel!, request, progress, ct);
+                },
+                "MCPSamplingHandler"
+            );
+
+            // The argument names must match the parameter names of the delegate the SK Function is created from
+            KernelArguments kernelArguments = new()
+            {
+                ["request"] = request,
+                ["progress"] = progress
+            };
+
+            FunctionResult functionResult = await skSamplingHandler.InvokeAsync(kernel!, kernelArguments, cancellationToken);
+
+            return functionResult.GetValue<CreateMessageResult>()!;
+        }
+    }
+
+    private static string GetMCPServerPath()
+    {
+        // Determine the configuration (Debug or Release)  
+        string configuration;
+
+#if DEBUG
+        configuration = "Debug";
+#else
+        configuration = "Release";
+#endif
+
+        return Path.Combine("..", "..", "..", "..", "MCPServer", "bin", configuration, "net8.0", "MCPServer.exe");
     }
 
     private static bool IsFlightQuery(string userMessage)

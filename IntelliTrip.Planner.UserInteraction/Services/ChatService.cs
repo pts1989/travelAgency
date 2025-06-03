@@ -142,7 +142,10 @@ namespace IntelliTrip.Planner.UserInteraction.Services
 public sealed class OrderStatusPlugin
 {
     [KernelFunction]
-    public string CheckOrderStatus(string orderId) => $"Order {orderId} is shipped and will arrive in 2-3 days.";
+    public string CheckOrderStatus(string orderId)
+    { 
+        return $"Order {orderId} is shipped and will arrive in 2-3 days.";
+    }
 }
 
 public sealed class OrderReturnPlugin
